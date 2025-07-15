@@ -1,0 +1,53 @@
+# GitHub Actions workflow to build the Android application
+# This file should be placed in: .github/workflows/android-build.yml
+
+name: Build Android APK
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events for the "main" branch
+  push:
+    branches: [ "main" ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Use the latest Ubuntu runner provided by GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Repository
+      # Fetches the source code of your repository.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up JDK 17
+      # Installs the Java Development Kit, which is required by Gradle.
+      # Caching is enabled to speed up subsequent builds.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # 3. Grant Execute Permission for Gradle Wrapper
+      # The gradlew script needs to be executable to run the build.
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # 4. Build with Gradle
+      # This is the core command that compiles the Java code, processes resources,
+      # and packages everything into the final APK file.
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+
+      # 5. Upload APK as Build Artifact
+      # This step takes the generated APK and makes it available for download
+      # from the workflow's summary page.
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
