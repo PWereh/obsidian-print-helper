@@ -1,0 +1,256 @@
+### **Objective:** To build the "Obsidian Print Helper" Android app (`.apk`) using only conversational prompts.
+
+### **Step 1: Project Initialization**
+
+First, we need to create a new, empty Android project.
+
+> **Your Prompt to the AI IDE:**
+> 
+> "Create a new Android application project. Use the 'Empty Activity' template. Set the application name to 'Obsidian Print Helper' and the package name to 'com.obsidianprinth.helper'. Use Java as the language."
+
+The IDE will generate a standard project structure. We will now modify the necessary files.
+
+### **Step 2: Configure Dependencies**
+
+We need to tell the build system to include the `commonmark` library for Markdown parsing.
+
+> **Your Prompt to the AI IDE:**
+> 
+> "Open the file at `app/build.gradle`. Replace its entire contents with the following code:"
+
+```
+// File: app/build.gradle
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.obsidianprinth.helper'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.obsidianprinth.helper"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'org.commonmark:commonmark:0.21.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+```
+
+> **Your Follow-up Prompt:**
+> 
+> "Sync the Gradle project to apply the changes."
+
+### **Step 3: Define the Custom URL Scheme**
+
+This is the most important step for connecting the app to Obsidian. We will modify the `AndroidManifest.xml` to register our app as the handler for `obsidian-print-helper://` links.
+
+> **Your Prompt to the AI IDE:**
+> 
+> "Open the file `app/src/main/AndroidManifest.xml`. Replace its entire contents with the following code:"
+
+```
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.obsidianprinth.helper">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@android:drawable/ic_menu_print"
+        android:label="@string/app_name"
+        android:roundIcon="@android:drawable/ic_menu_print"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Transparent.NoActionBar"
+        tools:targetApi="31">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="obsidian-print-helper" />
+            </intent-filter>
+
+        </activity>
+    </application>
+
+</manifest>
+```
+
+### **Step 4: Implement the Core Logic**
+
+Now we'll provide the complete Java code for the main activity. This code handles receiving the data from Obsidian, converting the Markdown, applying page setup, and starting the print job.
+
+> **Your Prompt to the AI IDE:**
+> 
+> "Open the Java file `app/src/main/java/com/obsidianprinth/helper/MainActivity.java`. Replace its entire contents with the following code:"
+
+```
+package com.obsidianprinth.helper;
+
+import android.content.Context;
+import android.net.Uri;
+import android.os.Bundle;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+
+public class MainActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        Uri data = getIntent().getData();
+        if (data != null) {
+            try {
+                String markdownContent = URLDecoder.decode(data.getQueryParameter("content"), "UTF-8");
+                String settingsJsonString = URLDecoder.decode(data.getQueryParameter("settings"), "UTF-8");
+                JSONObject settings = new JSONObject(settingsJsonString);
+                createPrintJob(markdownContent, settings);
+            } catch (UnsupportedEncodingException | JSONException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Error processing print data.", Toast.LENGTH_LONG).show();
+                finish();
+            }
+        } else {
+            finish();
+        }
+    }
+
+    private void createPrintJob(String markdown, JSONObject settings) {
+        WebView webView = new WebView(this);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                startPrint(view, settings);
+                view.postDelayed(MainActivity.this::finish, 1000);
+            }
+        });
+
+        Parser parser = Parser.builder().build();
+        Node document = parser.parse(markdown);
+        HtmlRenderer renderer = HtmlRenderer.builder().build();
+        String htmlContent = renderer.render(document);
+        String finalHtml = buildFinalHtml(htmlContent, settings);
+        webView.loadDataWithBaseURL("about:blank", finalHtml, "text/html", "UTF-8", null);
+    }
+
+    private String buildFinalHtml(String htmlContent, JSONObject settings) {
+        StringBuilder htmlBuilder = new StringBuilder();
+        htmlBuilder.append("<html><head><style>");
+        htmlBuilder.append("@page { ");
+        try {
+            htmlBuilder.append("margin-top: ").append(settings.getString("marginTop")).append("mm; ");
+            htmlBuilder.append("margin-bottom: ").append(settings.getString("marginBottom")).append("mm; ");
+            htmlBuilder.append("margin-left: ").append(settings.getString("marginLeft")).append("mm; ");
+            htmlBuilder.append("margin-right: ").append(settings.getString("marginRight")).append("mm; ");
+        } catch (JSONException e) {
+            htmlBuilder.append("margin: 20mm; ");
+        }
+        htmlBuilder.append("} body { font-family: sans-serif; }");
+        htmlBuilder.append("</style></head><body>");
+        htmlBuilder.append(htmlContent);
+        htmlBuilder.append("</body></html>");
+        return htmlBuilder.toString();
+    }
+
+    private void startPrint(WebView webView, JSONObject settings) {
+        PrintManager printManager = (PrintManager) this.getSystemService(Context.PRINT_SERVICE);
+        PrintDocumentAdapter printAdapter = webView.createPrintDocumentAdapter("ObsidianDocument");
+        String jobName = getString(R.string.app_name) + " Document";
+        PrintAttributes.Builder builder = new PrintAttributes.Builder();
+        try {
+            String pageSize = settings.getString("pageSize");
+            if ("Letter".equalsIgnoreCase(pageSize)) {
+                builder.setMediaSize(PrintAttributes.MediaSize.NA_LETTER);
+            } else if ("Legal".equalsIgnoreCase(pageSize)) {
+                builder.setMediaSize(PrintAttributes.MediaSize.NA_LEGAL);
+            } else {
+                builder.setMediaSize(PrintAttributes.MediaSize.ISO_A4);
+            }
+        } catch (JSONException e) {
+            builder.setMediaSize(PrintAttributes.MediaSize.ISO_A4);
+        }
+        printManager.print(jobName, printAdapter, builder.build());
+    }
+}
+```
+
+### **Step 5: Update Resources**
+
+Finally, we'll update the minimal UI and string resources. Since the app has no visible interface, these are very simple.
+
+> **Your Prompt to the AI IDE:**
+> 
+> "Open the file `app/src/main/res/layout/activity_main.xml`. Replace its contents with this:"
+
+```
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+```
+
+> **Your Follow-up Prompt:**
+> 
+> "Now open `app/src/main/res/values/strings.xml` and replace its contents with this:"
+
+```
+<resources>
+    <string name="app_name">Obsidian Print Helper</string>
+</resources>
+```
+
+### **Step 6: Build the Application**
+
+All the necessary files are now in place. The final step is to compile the application into an `.apk` file that can be installed on an Android device.
+
+> **Your Prompt to the AI IDE:**
+> 
+> "Build the project and generate a debug APK file. Provide me with a download link for the generated `app-debug.apk`."
+
+The AI IDE will now compile the project. Once it's finished, it should provide you with a link to download the installable `app-debug.apk` file. You can then transfer this file to your Android device and install it.

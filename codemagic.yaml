@@ -1,0 +1,22 @@
+# Codemagic CI/CD configuration file
+# This file should be placed in the root of your repository.
+
+workflows:
+  android-build:
+    name: Android Build
+    instance_type: mac_mini_m1 # Using macOS machine for broad compatibility
+    environment:
+      android_sdk_version: "34"
+      java_version: "17"
+    scripts:
+      - name: Generate Gradle Wrapper
+        script: |
+          gradle wrapper
+      - name: Make gradlew executable
+        script: |
+          chmod +x ./gradlew
+      - name: Build with Gradle
+        script: |
+          ./gradlew assembleDebug
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
