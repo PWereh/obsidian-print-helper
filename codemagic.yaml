@@ -1,22 +1,27 @@
-# Codemagic CI/CD configuration file
-# This file should be placed in the root of your repository.
+# Codemagic build configuration
+# For more information, see https://docs.codemagic.io/getting-started/yaml/
 
 workflows:
-  android-build:
-    name: Android Build
-    instance_type: mac_mini_m1 # Using macOS machine for broad compatibility
+  android-obsidian-helper-build:
+    name: Android Obsidian Helper Build
+    instance_type: mac_mini_m1
+    max_build_duration: 60
     environment:
       android_sdk_version: "34"
-      java_version: "17"
+      java: "11"
     scripts:
-      - name: Generate Gradle Wrapper
+      - name: Set up local properties
         script: |
-          gradle wrapper
-      - name: Make gradlew executable
-        script: |
-          chmod +x ./gradlew
-      - name: Build with Gradle
+          echo "sdk.dir=$ANDROID_HOME" > "$CM_BUILD_DIR/local.properties"
+      - name: Build debug APK
         script: |
           ./gradlew assembleDebug
     artifacts:
       - app/build/outputs/apk/debug/*.apk
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com # Replace with your email
+        notify:
+          success: true
+          failure: true
