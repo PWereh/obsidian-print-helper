@@ -1,0 +1,32 @@
+<!-- File: app/src/main/AndroidManifest.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.obsidianprint.helper"> <!-- Refactored -->
+
+    <application
+        android:allowBackup="true"
+        android:icon="@android:drawable/ic_menu_print"
+        android:label="@string/app_name"
+        android:roundIcon="@android:drawable/ic_menu_print"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Transparent.NoActionBar"
+        tools:targetApi="31">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- The scheme should remain the same unless you also update the plugin -->
+                <data android:scheme="obsidian-print-helper" />
+            </intent-filter>
+
+        </activity>
+    </application>
+
+</manifest>

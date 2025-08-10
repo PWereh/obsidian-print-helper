@@ -1,0 +1,83 @@
+// File: app/src/main/java/com/obsidianprint/helper/PrintViewModel.kt
+package com.obsidianprint.helper
+
+import android.app.Application
+import android.net.Uri
+import androidx.lifecycle.AndroidViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.URLDecoder
+
+// Changed to AndroidViewModel to get the Application context
+class PrintViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _uiState = MutableStateFlow<PrintUiState>(PrintUiState.Idle)
+    val uiState = _uiState.asStateFlow()
+
+    fun processIntentData(data: Uri?) {
+        if (data == null) {
+            _uiState.value = PrintUiState.Error("No data received from the plugin.")
+            return
+        }
+
+        _uiState.value = PrintUiState.Loading
+
+        try {
+            // 1. Get filePath and settings, with null checks
+            val filePathParam = data.getQueryParameter("filePath")
+            val settingsJsonString = data.getQueryParameter("settings")
+
+            if (filePathParam == null) {
+                _uiState.value = PrintUiState.Error("Error: 'filePath' parameter is missing in the URL.")
+                return
+            }
+            if (settingsJsonString == null) {
+                _uiState.value = PrintUiState.Error("Error: 'settings' parameter is missing in the URL.")
+                return
+            }
+
+            val filePath = URLDecoder.decode(filePathParam, "UTF-8")
+            val settings = JSONObject(URLDecoder.decode(settingsJsonString, "UTF-8"))
+
+            // 2. Read the HTML content from the file
+            val htmlContent = readHtmlFromFile(filePath)
+
+            _uiState.value = PrintUiState.Success(htmlContent, settings)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _uiState.value = PrintUiState.Error("Error processing print data: ${e.localizedMessage}")
+        }
+    }
+
+    private fun readHtmlFromFile(filePath: String): String {
+        val application = getApplication<Application>()
+        val contentResolver = application.contentResolver
+        val uri = Uri.parse(filePath)
+        val stringBuilder = StringBuilder()
+
+        contentResolver.openInputStream(uri)?.use { inputStream ->
+            BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                var line: String? = reader.readLine()
+                while (line != null) {
+                    stringBuilder.append(line)
+                    line = reader.readLine()
+                }
+            }
+        }
+        return stringBuilder.toString()
+    }
+
+    // Markdown parsing and HTML building logic has been removed as it's now handled by the plugin.
+}
+
+// Sealed interface to represent the different states of the UI
+sealed interface PrintUiState {
+    object Idle : PrintUiState
+    object Loading : PrintUiState
+    data class Success(val htmlContent: String, val settings: JSONObject) : PrintUiState
+    data class Error(val message: String) : PrintUiState
+}
